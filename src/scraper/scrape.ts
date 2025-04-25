@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import { Page } from 'puppeteer';
 import { launchBrowser } from './browserLauncher';
 
 export interface NewsItem {
@@ -21,7 +20,7 @@ export interface NewsItem {
 
 export async function scrapeBBC(): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto('https://www.bbc.com/news', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('a.gs-c-promo-heading')).slice(0, 5).map(el => ({
@@ -37,15 +36,15 @@ export async function scrapeBBC(): Promise<NewsItem[]> {
 
 export async function scrapeElPais(): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto('https://elpais.com/', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('h2.c_t')).slice(0, 5).map(el => {
-      const anchor = el.querySelector('a');
+      const a = el.querySelector('a');
       return {
         id: 'elpais',
-        title: anchor?.textContent?.trim() || '',
-        url: anchor instanceof HTMLAnchorElement ? anchor.href : '',
+        title: el.textContent?.trim() || '',
+        url: a instanceof HTMLAnchorElement ? a.href : '',
         source: 'El País',
       };
     });
@@ -56,7 +55,7 @@ export async function scrapeElPais(): Promise<NewsItem[]> {
 
 export async function scrapeLeMonde(): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto('https://www.lemonde.fr/', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('section.article__wrapper h3.article__title a')).slice(0, 5).map(el => ({
@@ -72,7 +71,7 @@ export async function scrapeLeMonde(): Promise<NewsItem[]> {
 
 export async function scrapeElPeruano(): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto('https://elperuano.pe/', { waitUntil: 'domcontentloaded' });
   // Intentar obtener titulares principales de "Actualidad" o portada
   const news = await page.evaluate(() => {
@@ -100,7 +99,7 @@ export async function scrapeElPeruano(): Promise<NewsItem[]> {
 
 export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: string, subcategories?: { name: string, url: string }[] }[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto('https://elperuano.pe/', { waitUntil: 'domcontentloaded' });
   const categorias = await page.evaluate(() => {
     const base = 'https://elperuano.pe';
@@ -144,7 +143,7 @@ export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: 
 
 export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
   // Esperar a que carguen los artículos reales (no skeletons)
@@ -232,7 +231,7 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
       }
       let detalle = { titulo: '', subtitulo: '', contenido: '' };
       try {
-        const pageDetalle = await browser.newPage();
+        const pageDetalle: any = await browser.newPage();
         await pageDetalle.goto(item.url, { waitUntil: 'domcontentloaded' });
         await pageDetalle.waitForFunction(() => !document.querySelector('.skeleton-nota'), { timeout: 8000 }).catch(() => {});
         detalle = await pageDetalle.evaluate(() => {
@@ -270,7 +269,7 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
 
 export async function scrapeElPeruanoNoticiaDetalle(url: string): Promise<{ titulo: string, subtitulo: string, contenido: string }> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
   // Esperar a que desaparezcan skeletons si existen (hasta 8s)
@@ -311,7 +310,7 @@ export async function scrapeElPeruanoNoticiasPorCategoria(): Promise<{ categoria
 
 export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
   // Espera a que cargue la lista principal de noticias
@@ -365,7 +364,7 @@ export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
 
 export async function scrapeDeporCategoriaResumen(url: string, limit: number = 20): Promise<{ title: string, img: string, url: string }[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.stories-news__list .story-item', { timeout: 10000 });
   const news = await page.evaluate((base, limit) => {
@@ -404,7 +403,7 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
   let cache: NewsItem[] = await readCache(cacheFile);
 
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.stories-news__list .story-item', { timeout: 10000 });
   const items = await page.evaluate((base, limit) => {
@@ -457,7 +456,7 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
         return { ...cached, _idx: item._idx };
       }
       // Si no está en la cache o cambió la fecha, scrapear detalle
-      const detailPage = await browser.newPage();
+      const detailPage: any = await browser.newPage();
       try {
         await detailPage.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 10000 });
         await detailPage.waitForSelector('.sht__title', { timeout: 5000 });
@@ -525,7 +524,7 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
   return results.map(({ _idx, ...rest }) => rest);
 }
 
-export async function scrapeJornadaCategorias(page: Page): Promise<{ name: string, url: string }[]> {
+export async function scrapeJornadaCategorias(page: any): Promise<{ name: string, url: string }[]> {
   await page.goto('https://jornada.com.pe/', { waitUntil: 'domcontentloaded' });
   const categorias = await page.evaluate(() => {
     const result: { name: string, url: string }[] = [];
@@ -544,7 +543,7 @@ export async function scrapeJornadaCategorias(page: Page): Promise<{ name: strin
   return categorias;
 }
 
-export async function scrapeJornadaCategoria(page: Page, url: string): Promise<NewsItem[]> {
+export async function scrapeJornadaCategoria(page: any, url: string): Promise<NewsItem[]> {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   const articles = await page.evaluate(() => {
     const result: { title: string, url: string, img?: string, date?: string, summary?: string }[] = [];
@@ -568,7 +567,7 @@ export async function scrapeJornadaCategoria(page: Page, url: string): Promise<N
   // Extraer detalles de cada noticia (contenido) en paralelo
   const news: NewsItem[] = [];
   const detailPromises = articles.map(async (art) => {
-    const detailPage = await page.browser().newPage();
+    const detailPage: any = await page.browser().newPage();
     try {
       const detail = await scrapeJornadaDetalle(detailPage, art.url);
       // Genera el summary como extracto reducido del contenido
@@ -606,7 +605,7 @@ export async function scrapeJornadaCategoria(page: Page, url: string): Promise<N
   return news;
 }
 
-export async function scrapeJornadaDetalle(page: Page, url: string): Promise<{ content: string, date?: string, titulo?: string, subtitulo?: string }> {
+export async function scrapeJornadaDetalle(page: any, url: string): Promise<{ content: string, date?: string, titulo?: string, subtitulo?: string }> {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   // Extraer título
   const titulo = await page.evaluate(() => {
@@ -647,7 +646,7 @@ export async function scrapeJornadaDetalle(page: Page, url: string): Promise<{ c
 
 export async function scrapeJornadaCategoriasSimple(): Promise<{ name: string, url: string }[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   try {
     const result = await scrapeJornadaCategorias(page);
     await browser.close();
@@ -660,7 +659,7 @@ export async function scrapeJornadaCategoriasSimple(): Promise<{ name: string, u
 
 export async function scrapeJornadaCategoriaSimple(url: string): Promise<NewsItem[]> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   try {
     const result = await scrapeJornadaCategoria(page, url);
     await browser.close();
@@ -673,7 +672,7 @@ export async function scrapeJornadaCategoriaSimple(url: string): Promise<NewsIte
 
 export async function scrapeJornadaDetalleSimple(url: string): Promise<{ content: string, date?: string, titulo?: string, subtitulo?: string }> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const page: any = await browser.newPage();
   try {
     const result = await scrapeJornadaDetalle(page, url);
     await browser.close();
@@ -687,7 +686,7 @@ export async function scrapeJornadaDetalleSimple(url: string): Promise<{ content
 // Agrega Jornada al flujo principal de scraping optimizado: concurrencia máxima en categorías y detalles, máximo 10 noticias
 export async function scrapeJornada() {
   const browser = await launchBrowser();
-  const mainPage = await browser.newPage();
+  const mainPage: any = await browser.newPage();
   // Opcional: prioriza categorías más relevantes si lo sabes
   let categorias = await scrapeJornadaCategorias(mainPage);
   // Ejemplo: prioriza "Actualidad" y "Política" si existen
@@ -705,7 +704,7 @@ export async function scrapeJornada() {
 
   // 1. Obtén artículos de todas las categorías (concurrencia)
   const catConcurrency = 8; // Número de tabs en paralelo para categorías
-  const catPages: Page[] = [];
+  const catPages: any[] = [];
   for (let i = 0; i < catConcurrency; i++) {
     catPages.push(await browser.newPage());
   }
@@ -752,7 +751,7 @@ export async function scrapeJornada() {
 
   // 2. Scraping paralelo real de detalles usando varias páginas (pool de 16 tabs)
   const concurrency = 16; // Número de tabs en paralelo para detalles
-  const pages: Page[] = [];
+  const pages: any[] = [];
   for (let i = 0; i < concurrency; i++) {
     pages.push(await browser.newPage());
   }
