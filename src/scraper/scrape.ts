@@ -1,44 +1,21 @@
+import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 import type { Page, Browser } from 'puppeteer-core';
-let puppeteerLib = puppeteer;
-let chrome: typeof import('chrome-aws-lambda') | null = null;
-let isVercel = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
 
-if (isVercel) {
-  try {
-    // Solo importa si está en Vercel
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    chrome = require('chrome-aws-lambda') as typeof import('chrome-aws-lambda');
-    puppeteerLib = require('puppeteer-core');
-  } catch (e) {
-    // Fallback: sigue con puppeteer normal
-  }
-}
+const isVercel = !!process.env.AWS_LAMBDA_FUNCTION_VERSION || !!process.env.VERCEL;
 
-// Utiliza puppeteerLib y chrome.launch en vez de puppeteer.launch
-function getBrowserLaunchOptions(): {
-  args?: any;
-  headless?: boolean;
-  defaultViewport?: any;
-} {
-  if (isVercel && chrome) {
-    return {
-      args: chrome.args,
-      headless: chrome.headless,
-      defaultViewport: chrome.defaultViewport,
-    };
-  }
-  return { headless: true };
-}
-
-// Helper para lanzar browser correctamente en Vercel
 async function launchBrowser() {
-  if (isVercel && chrome) {
-    const opts = getBrowserLaunchOptions() as any;
-    opts.executablePath = await chrome.executablePath; // Ahora sí, string resuelto
-    return await puppeteerLib.launch(opts);
+  if (isVercel) {
+    return await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
+    });
+  } else {
+    return await puppeteer.launch({ headless: true });
   }
-  return await puppeteerLib.launch(getBrowserLaunchOptions());
 }
 
 export interface NewsItem {
