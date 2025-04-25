@@ -24,7 +24,9 @@
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
-    "puppeteer": "^21.11.0",
+    "glob": "^11.0.2",
+    "puppeteer-core": "^10.1.0",
+    "chrome-aws-lambda": "^10.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

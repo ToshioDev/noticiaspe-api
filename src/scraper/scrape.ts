@@ -1,4 +1,32 @@
-import puppeteer, { Page } from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import type { Page, Browser } from 'puppeteer-core';
+let puppeteerLib = puppeteer;
+let chrome: typeof import('chrome-aws-lambda') | null = null;
+let isVercel = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
+
+if (isVercel) {
+  try {
+    // Solo importa si está en Vercel
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    chrome = require('chrome-aws-lambda') as typeof import('chrome-aws-lambda');
+    puppeteerLib = require('puppeteer-core');
+  } catch (e) {
+    // Fallback: sigue con puppeteer normal
+  }
+}
+
+// Utiliza puppeteerLib y chrome.launch en vez de puppeteer.launch
+function getBrowserLaunchOptions() {
+  if (isVercel && chrome) {
+    return {
+      args: (chrome as any).args,
+      executablePath: (chrome as any).executablePath,
+      headless: (chrome as any).headless,
+      defaultViewport: (chrome as any).defaultViewport,
+    };
+  }
+  return { headless: true };
+}
 
 export interface NewsItem {
   id: string; // Identificador de la página: 'bbc', 'elpais', 'lemonde'
@@ -18,7 +46,7 @@ export interface NewsItem {
 }
 
 export async function scrapeBBC(): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto('https://www.bbc.com/news', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
@@ -34,7 +62,7 @@ export async function scrapeBBC(): Promise<NewsItem[]> {
 }
 
 export async function scrapeElPais(): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto('https://elpais.com/', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
@@ -53,7 +81,7 @@ export async function scrapeElPais(): Promise<NewsItem[]> {
 }
 
 export async function scrapeLeMonde(): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto('https://www.lemonde.fr/', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
@@ -69,7 +97,7 @@ export async function scrapeLeMonde(): Promise<NewsItem[]> {
 }
 
 export async function scrapeElPeruano(): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto('https://elperuano.pe/', { waitUntil: 'domcontentloaded' });
   // Intentar obtener titulares principales de "Actualidad" o portada
@@ -98,7 +126,7 @@ export async function scrapeElPeruano(): Promise<NewsItem[]> {
 
 // Extrae las categorías principales y subcategorías del menú principal de El Peruano
 export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: string, subcategories?: { name: string, url: string }[] }[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto('https://elperuano.pe/', { waitUntil: 'domcontentloaded' });
   const categorias = await page.evaluate(() => {
@@ -143,7 +171,7 @@ export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: 
 
 // Extrae las noticias principales de una url de sección de El Peruano (desfragmentando cada card)
 export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -160,7 +188,7 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
   let prevCount = 0;
   for (let i = 0; i < 2; i++) { // Haz scroll 2 veces para asegurar 20 noticias
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(500); // Espera poco tiempo para cargar
+    await new Promise(res => setTimeout(res, 500)); // Espera poco tiempo para cargar
     const count = await page.evaluate(() => {
       const section = document.querySelector('#notasseccion');
       if (!section) return 0;
@@ -266,7 +294,7 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
 
 // Scrapea el detalle de una noticia de El Peruano: título, subtítulo y contenido
 export async function scrapeElPeruanoNoticiaDetalle(url: string): Promise<{ titulo: string, subtitulo: string, contenido: string }> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -309,7 +337,7 @@ export async function scrapeElPeruanoNoticiasPorCategoria(): Promise<{ categoria
 
 // Scrapea noticias de una categoría de El Depor (estructura HTML precisa)
 export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -364,7 +392,7 @@ export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
 
 // Scrapea solo título e imagen de la lista de noticias de una categoría de El Depor, con límite configurable
 export async function scrapeDeporCategoriaResumen(url: string, limit: number = 20): Promise<{ title: string, img: string, url: string }[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.stories-news__list .story-item', { timeout: 10000 });
@@ -404,7 +432,7 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
   const cacheFile = 'cache/depor.json';
   let cache: NewsItem[] = await readCache(cacheFile);
 
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.stories-news__list .story-item', { timeout: 10000 });
@@ -634,7 +662,7 @@ export async function scrapeJornadaDetalle(page: Page, url: string): Promise<{ c
 // === Funciones auxiliares para compatibilidad con el controlador ===
 
 export async function scrapeJornadaCategoriasSimple(): Promise<{ name: string, url: string }[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   try {
     const result = await scrapeJornadaCategorias(page);
@@ -647,7 +675,7 @@ export async function scrapeJornadaCategoriasSimple(): Promise<{ name: string, u
 }
 
 export async function scrapeJornadaCategoriaSimple(url: string): Promise<NewsItem[]> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   try {
     const result = await scrapeJornadaCategoria(page, url);
@@ -660,7 +688,7 @@ export async function scrapeJornadaCategoriaSimple(url: string): Promise<NewsIte
 }
 
 export async function scrapeJornadaDetalleSimple(url: string): Promise<{ content: string, date?: string, titulo?: string, subtitulo?: string }> {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
   try {
     const result = await scrapeJornadaDetalle(page, url);
@@ -674,7 +702,7 @@ export async function scrapeJornadaDetalleSimple(url: string): Promise<{ content
 
 // Agrega Jornada al flujo principal de scraping optimizado: concurrencia máxima en categorías y detalles, máximo 10 noticias
 export async function scrapeJornada() {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
   const mainPage = await browser.newPage();
   // Opcional: prioriza categorías más relevantes si lo sabes
   let categorias = await scrapeJornadaCategorias(mainPage);
@@ -784,7 +812,7 @@ export async function scrapeJornada() {
         source: 'Jornada',
         summary: resumen,
         img: art.img,
-        date: date || art.date || '',
+        date: formatDateToIsoPeru(date || art.date || ''),
         titulo_detalle: titulo || art.title || '',
         subtitulo: subtitulo || art.summary || '',
         contenido: content
@@ -797,7 +825,7 @@ export async function scrapeJornada() {
         source: 'Jornada',
         summary: '',
         img: art.img,
-        date: art.date || '',
+        date: formatDateToIsoPeru(art.date || ''),
         titulo_detalle: '',
         subtitulo: art.summary || '',
         contenido: ''
@@ -848,16 +876,21 @@ async function writeCache(file: string, data: NewsItem[]): Promise<void> {
   writeFileSync(file, JSON.stringify(data));
 }
 
-// Función auxiliar para formatear fecha a ISO con zona horaria -05:00
-function formatDateToIsoPeru(dateStr: string): string {
+// Función auxiliar para formatear fecha a ISO con zona horaria -05:00 (hora de Perú)
+export function formatDateToIsoPeru(dateStr: string): string {
   // Intenta parsear fechas tipo "24/04/2025 22:07" o "24/04/2025"
   const match = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
   if (match) {
     const [, dd, mm, yyyy, hh, min] = match;
-    const date = new Date(`${yyyy}-${mm}-${dd}T${hh || '00'}:${min || '00'}:00-05:00`);
-    return date.toISOString().replace('Z', '-05:00');
+    // Siempre crea la fecha en zona horaria -05:00
+    // Evita usar Date() porque asume UTC/local, mejor construye string manual
+    const fecha = `${yyyy}-${mm}-${dd}T${hh || '00'}:${min || '00'}:00-05:00`;
+    return fecha;
   }
-  // Si ya es ISO, retorna igual
-  if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateStr)) return dateStr;
+  // Si ya es ISO y tiene zona horaria, fuerza a -05:00
+  if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateStr)) {
+    // Reemplaza cualquier zona horaria por -05:00
+    return dateStr.replace(/([+-]\d{2}:\d{2}|Z)$/, '-05:00');
+  }
   return dateStr;
 }
