@@ -16,16 +16,31 @@ if (isVercel) {
 }
 
 // Utiliza puppeteerLib y chrome.launch en vez de puppeteer.launch
-function getBrowserLaunchOptions() {
+function getBrowserLaunchOptions(): {
+  args?: any;
+  executablePath?: string;
+  headless?: boolean;
+  defaultViewport?: any;
+} {
   if (isVercel && chrome) {
     return {
-      args: (chrome as any).args,
-      executablePath: (chrome as any).executablePath,
-      headless: (chrome as any).headless,
-      defaultViewport: (chrome as any).defaultViewport,
+      args: chrome.args,
+      executablePath: undefined, // será sobreescrito dinámicamente
+      headless: chrome.headless,
+      defaultViewport: chrome.defaultViewport,
     };
   }
   return { headless: true };
+}
+
+// Helper para lanzar browser correctamente en Vercel
+async function launchBrowser() {
+  if (isVercel && chrome) {
+    const opts = getBrowserLaunchOptions();
+    opts.executablePath = await chrome.executablePath;
+    return await puppeteerLib.launch(opts);
+  }
+  return await puppeteerLib.launch(getBrowserLaunchOptions());
 }
 
 export interface NewsItem {
@@ -46,7 +61,7 @@ export interface NewsItem {
 }
 
 export async function scrapeBBC(): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto('https://www.bbc.com/news', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
@@ -62,7 +77,7 @@ export async function scrapeBBC(): Promise<NewsItem[]> {
 }
 
 export async function scrapeElPais(): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto('https://elpais.com/', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
@@ -81,7 +96,7 @@ export async function scrapeElPais(): Promise<NewsItem[]> {
 }
 
 export async function scrapeLeMonde(): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto('https://www.lemonde.fr/', { waitUntil: 'domcontentloaded' });
   const news = await page.evaluate(() => {
@@ -97,7 +112,7 @@ export async function scrapeLeMonde(): Promise<NewsItem[]> {
 }
 
 export async function scrapeElPeruano(): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto('https://elperuano.pe/', { waitUntil: 'domcontentloaded' });
   // Intentar obtener titulares principales de "Actualidad" o portada
@@ -126,7 +141,7 @@ export async function scrapeElPeruano(): Promise<NewsItem[]> {
 
 // Extrae las categorías principales y subcategorías del menú principal de El Peruano
 export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: string, subcategories?: { name: string, url: string }[] }[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto('https://elperuano.pe/', { waitUntil: 'domcontentloaded' });
   const categorias = await page.evaluate(() => {
@@ -171,7 +186,7 @@ export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: 
 
 // Extrae las noticias principales de una url de sección de El Peruano (desfragmentando cada card)
 export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -294,7 +309,7 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
 
 // Scrapea el detalle de una noticia de El Peruano: título, subtítulo y contenido
 export async function scrapeElPeruanoNoticiaDetalle(url: string): Promise<{ titulo: string, subtitulo: string, contenido: string }> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -337,7 +352,7 @@ export async function scrapeElPeruanoNoticiasPorCategoria(): Promise<{ categoria
 
 // Scrapea noticias de una categoría de El Depor (estructura HTML precisa)
 export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -392,7 +407,7 @@ export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
 
 // Scrapea solo título e imagen de la lista de noticias de una categoría de El Depor, con límite configurable
 export async function scrapeDeporCategoriaResumen(url: string, limit: number = 20): Promise<{ title: string, img: string, url: string }[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.stories-news__list .story-item', { timeout: 10000 });
@@ -432,7 +447,7 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
   const cacheFile = 'cache/depor.json';
   let cache: NewsItem[] = await readCache(cacheFile);
 
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.stories-news__list .story-item', { timeout: 10000 });
@@ -662,7 +677,7 @@ export async function scrapeJornadaDetalle(page: Page, url: string): Promise<{ c
 // === Funciones auxiliares para compatibilidad con el controlador ===
 
 export async function scrapeJornadaCategoriasSimple(): Promise<{ name: string, url: string }[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   try {
     const result = await scrapeJornadaCategorias(page);
@@ -675,7 +690,7 @@ export async function scrapeJornadaCategoriasSimple(): Promise<{ name: string, u
 }
 
 export async function scrapeJornadaCategoriaSimple(url: string): Promise<NewsItem[]> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   try {
     const result = await scrapeJornadaCategoria(page, url);
@@ -688,7 +703,7 @@ export async function scrapeJornadaCategoriaSimple(url: string): Promise<NewsIte
 }
 
 export async function scrapeJornadaDetalleSimple(url: string): Promise<{ content: string, date?: string, titulo?: string, subtitulo?: string }> {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   try {
     const result = await scrapeJornadaDetalle(page, url);
@@ -702,7 +717,7 @@ export async function scrapeJornadaDetalleSimple(url: string): Promise<{ content
 
 // Agrega Jornada al flujo principal de scraping optimizado: concurrencia máxima en categorías y detalles, máximo 10 noticias
 export async function scrapeJornada() {
-  const browser = await puppeteerLib.launch(getBrowserLaunchOptions());
+  const browser = await launchBrowser();
   const mainPage = await browser.newPage();
   // Opcional: prioriza categorías más relevantes si lo sabes
   let categorias = await scrapeJornadaCategorias(mainPage);
