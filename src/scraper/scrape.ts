@@ -18,14 +18,12 @@ if (isVercel) {
 // Utiliza puppeteerLib y chrome.launch en vez de puppeteer.launch
 function getBrowserLaunchOptions(): {
   args?: any;
-  executablePath?: string;
   headless?: boolean;
   defaultViewport?: any;
 } {
   if (isVercel && chrome) {
     return {
       args: chrome.args,
-      executablePath: undefined, // será sobreescrito dinámicamente
       headless: chrome.headless,
       defaultViewport: chrome.defaultViewport,
     };
@@ -36,8 +34,8 @@ function getBrowserLaunchOptions(): {
 // Helper para lanzar browser correctamente en Vercel
 async function launchBrowser() {
   if (isVercel && chrome) {
-    const opts = getBrowserLaunchOptions();
-    opts.executablePath = await chrome.executablePath;
+    const opts = getBrowserLaunchOptions() as any;
+    opts.executablePath = await chrome.executablePath; // Ahora sí, string resuelto
     return await puppeteerLib.launch(opts);
   }
   return await puppeteerLib.launch(getBrowserLaunchOptions());
