@@ -2,19 +2,22 @@ import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 import type { Page, Browser } from 'puppeteer-core';
 
-const isVercel = !!process.env.AWS_LAMBDA_FUNCTION_VERSION || !!process.env.VERCEL;
+const isVercelProd = process.env.VERCEL_ENV === 'production' || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
 
 async function launchBrowser() {
-  if (isVercel) {
+  if (isVercelProd) {
     return await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
+      args: chromium.args,
       headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport,
       ignoreHTTPSErrors: true,
     });
   } else {
-    return await puppeteer.launch({ headless: true });
+    return await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
   }
 }
 
