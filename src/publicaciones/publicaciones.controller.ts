@@ -11,8 +11,7 @@ import {
   scrapeDeporCategoriaCompleto, 
   scrapeJornada, 
   scrapeJornadaCategoriaSimple,
-  scrapeJornadaCategoriasSimple,
-  formatDateToIsoPeru
+  scrapeJornadaCategoriasSimple
 } from '../scraper/scrape';
 import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 
@@ -76,24 +75,6 @@ export class PublicacionesController {
       }
       const rawNoticias = await scrapeElPeruanoNoticiasDeSeccion(url);
       noticias = rawNoticias.map((n, idx) => ({ ...n, id: idx + 1 }));
-      const t1 = Date.now();
-      return { status: 'ok', ping: formatPing(t1 - t0), data: noticias };
-    }
-    if (site === 'bbc') {
-      // BBC solo soporta noticias generales, ignora categoria
-      const lim = limit ? Math.max(1, Math.min(Number(limit), 50)) : 10;
-      const rawNoticias = await scrapeBBC();
-      // Si scrapeBBC no trae fecha, la agregamos con la hora de Perú (ahora)
-      const nowPeru = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().replace('Z', '-05:00');
-      noticias = rawNoticias.slice(0, lim).map((n, idx) => ({
-        ...n,
-        id: idx + 1,
-        date: n.date ? formatDateToIsoPeru(n.date) : nowPeru,
-        summary: n.summary || '',
-        titulo_detalle: n.title,
-        subtitulo: '',
-        contenido: '',
-      }));
       const t1 = Date.now();
       return { status: 'ok', ping: formatPing(t1 - t0), data: noticias };
     }

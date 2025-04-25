@@ -1,25 +1,6 @@
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
-import type { Page, Browser } from 'puppeteer-core';
-
-const isVercelProd = process.env.VERCEL_ENV === 'production' || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
-
-async function launchBrowser() {
-  if (isVercelProd) {
-    return await puppeteer.launch({
-      executablePath: await chromium.executablePath(),
-      args: chromium.args,
-      headless: chromium.headless,
-      defaultViewport: chromium.defaultViewport,
-      ignoreHTTPSErrors: true,
-    });
-  } else {
-    return await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-  }
-}
+import 'dotenv/config';
+import { Page } from 'puppeteer';
+import { launchBrowser } from './browserLauncher';
 
 export interface NewsItem {
   id: string; // Identificador de la página: 'bbc', 'elpais', 'lemonde'
@@ -117,7 +98,6 @@ export async function scrapeElPeruano(): Promise<NewsItem[]> {
   return news;
 }
 
-// Extrae las categorías principales y subcategorías del menú principal de El Peruano
 export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: string, subcategories?: { name: string, url: string }[] }[]> {
   const browser = await launchBrowser();
   const page = await browser.newPage();
@@ -126,7 +106,7 @@ export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: 
     const base = 'https://elperuano.pe';
     const ul = document.querySelector('ul.hide-on-med-and-down.inlineblock');
     if (!ul) return [];
-    const categorias: { name: string, url: string, subcategories?: { name: string, url: string }[] }[] = [];
+    const categorias: any[] = [];
     ul.querySelectorAll(':scope > li').forEach(li => {
       const a = li.querySelector(':scope > a');
       if (!a) return;
@@ -162,7 +142,6 @@ export async function scrapeElPeruanoCategorias(): Promise<{ name: string, url: 
   return categorias;
 }
 
-// Extrae las noticias principales de una url de sección de El Peruano (desfragmentando cada card)
 export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<NewsItem[]> {
   const browser = await launchBrowser();
   const page = await browser.newPage();
@@ -246,7 +225,7 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
   const results: NewsItem[] = [];
   let idx = 0;
   async function processBatch(batch: any[]) {
-    await Promise.all(batch.map(async (item) => {
+    const batchResults = await Promise.allSettled(batch.map(async (item) => {
       if (!item.url) {
         results.push(item);
         return;
@@ -275,6 +254,10 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
         date: formatDateToIsoPeru(item.date) // Formatea la fecha a ISO con zona horaria -05:00
       });
     }));
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled' && r.value) results.push(r.value);
+    }
+    idx += concurrency;
   }
   while (idx < news.length) {
     const batch = news.slice(idx, idx + concurrency);
@@ -285,7 +268,6 @@ export async function scrapeElPeruanoNoticiasDeSeccion(url: string): Promise<New
   return results;
 }
 
-// Scrapea el detalle de una noticia de El Peruano: título, subtítulo y contenido
 export async function scrapeElPeruanoNoticiaDetalle(url: string): Promise<{ titulo: string, subtitulo: string, contenido: string }> {
   const browser = await launchBrowser();
   const page = await browser.newPage();
@@ -311,7 +293,6 @@ export async function scrapeElPeruanoNoticiaDetalle(url: string): Promise<{ titu
   return data;
 }
 
-// Extrae las noticias de todas las categorías y subcategorías de El Peruano
 export async function scrapeElPeruanoNoticiasPorCategoria(): Promise<{ categorias: any[], noticias_por_categoria: { [categoria: string]: NewsItem[] } }> {
   const categorias = await scrapeElPeruanoCategorias();
   const noticias_por_categoria: { [categoria: string]: NewsItem[] } = {};
@@ -328,7 +309,6 @@ export async function scrapeElPeruanoNoticiasPorCategoria(): Promise<{ categoria
   return { categorias, noticias_por_categoria };
 }
 
-// Scrapea noticias de una categoría de El Depor (estructura HTML precisa)
 export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
   const browser = await launchBrowser();
   const page = await browser.newPage();
@@ -383,7 +363,6 @@ export async function scrapeDeporCategoria(url: string): Promise<NewsItem[]> {
   return news.filter(n => n.title && n.url);
 }
 
-// Scrapea solo título e imagen de la lista de noticias de una categoría de El Depor, con límite configurable
 export async function scrapeDeporCategoriaResumen(url: string, limit: number = 20): Promise<{ title: string, img: string, url: string }[]> {
   const browser = await launchBrowser();
   const page = await browser.newPage();
@@ -410,7 +389,6 @@ export async function scrapeDeporCategoriaResumen(url: string, limit: number = 2
   return news.filter(n => n.title && n.img);
 }
 
-// Scrapea las dos categorías principales de fútbol de Depor
 export async function scrapeDeporFutbolCategorias(): Promise<{ peruano: NewsItem[], internacional: NewsItem[] }> {
   const peruanoUrl = 'https://depor.com/futbol-peruano/';
   const internacionalUrl = 'https://depor.com/futbol-internacional/';
@@ -452,7 +430,16 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
       if (sectionA) section = sectionA.textContent?.trim() || '';
       const dateP = item.querySelector('p.story-item__date');
       if (dateP) date = dateP.textContent?.trim() || '';
-      return { title, url, img, subtitle, section, date };
+      return {
+        id: 'depor',
+        title,
+        subtitle,
+        url,
+        source: 'Depor',
+        section,
+        img,
+        date
+      };
     });
   }, 'https://depor.com', limit);
 
@@ -461,8 +448,7 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
   const concurrency = 8;
   const results: (NewsItem & { _idx: number })[] = [];
   let idx = 0;
-  while (idx < itemsWithIndex.length) {
-    const batch = itemsWithIndex.slice(idx, idx + concurrency);
+  async function processBatch(batch: any[]) {
     const batchResults = await Promise.allSettled(batch.map(async (item) => {
       if (!item.url) return null;
       // Buscar en cache por url y date, pero si content está vacío, forzar scraping
@@ -523,6 +509,11 @@ export async function scrapeDeporCategoriaCompleto(url: string, limit: number = 
     for (const r of batchResults) {
       if (r.status === 'fulfilled' && r.value) results.push(r.value);
     }
+    idx += concurrency;
+  }
+  while (idx < itemsWithIndex.length) {
+    const batch = itemsWithIndex.slice(idx, idx + concurrency);
+    await processBatch(batch);
     idx += concurrency;
   }
   await browser.close();
@@ -870,7 +861,7 @@ async function writeCache(file: string, data: NewsItem[]): Promise<void> {
 }
 
 // Función auxiliar para formatear fecha a ISO con zona horaria -05:00 (hora de Perú)
-export function formatDateToIsoPeru(dateStr: string): string {
+function formatDateToIsoPeru(dateStr: string): string {
   // Intenta parsear fechas tipo "24/04/2025 22:07" o "24/04/2025"
   const match = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
   if (match) {
